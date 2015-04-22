@@ -1,6 +1,7 @@
 {
     "name": "hp197/combiner",
     "description": "A library to combine Javascript and CSS files",
+    "version": "1.0-dev",
     "keywords": [
         "js", "javascript", "css", "utility", "combine"
     ],
