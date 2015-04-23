@@ -45,7 +45,45 @@ class Combiner
 			return $response;
 		}
 
-		dd($route, $request, $response);
+		$files = explode(',', $route->parameter('files', ''));
+
+		if ($route->parameter('count', 0) <> count($files))
+		{
+			$this->app->abort(422, 'Length option incorrect');
+		}
+
+		$data = '';
+		$files = $this->sanitize_files($files);
+		$filesstr = implode('_', $files);
+
+		$etag = implode('-', $request->getETags());
+
+		if (\Cache::has(sprintf('%s_%s_%d', $etag, $filesstr, $count)))
+		{
+			$data = \Cache::get(sprintf('%s_%s_%d', $etag, $filesstr, $count));
+
+			return $this->output($response, $data);
+		}
+
+		$basedir = $this->app->basePath() . DIRECTORY_SEPARATOR . $this->app->config->get('combiner.javascript.path');
+
+		foreach ($files as $file)
+		{
+			$fullfile = $basedir . DIRECTORY_SEPARATOR . $file;
+
+			if (!(preg_match('#\.js$#i', $file) && file_exists($fullfile)))
+			{
+				continue;
+			}
+
+			$data .= file_get_contents($fullfile) . PHP_EOL;
+		}
+
+		$this->output($response, $data);
+
+		\Cache::put(sprintf('%s_%s_%d', $response->getEtag(), $filesstr, $count), $data, \Carbin::Carbon()->addMinutes(60));
+
+		return $response;
 	}
 
 	/**
@@ -59,12 +97,17 @@ class Combiner
 	 */
 	public function viewCss(Route $route, Request $request, Response $response)
 	{
-		if (!$this->isResponseObject($response))
+	if (!$this->isResponseObject($response))
 		{
 			return $response;
 		}
 
-		dd($route, $request, $response);
+		$files = explode(',', $route->parameter('files', ''));
+
+		if ($route->parameter('count', 0) <> count($files))
+		{
+			$this->app->abort(422, 'Length option incorrect');
+		}
 	}
 
 	/**
@@ -222,5 +265,30 @@ class Combiner
 	protected function arrayPush(&$array, $value)
 	{
 		return (in_array($value, $array) || array_push($array, $value));
+	}
+
+	protected function output(Response &$response, $data='')
+	{
+		$etag = \Crypt::hash('js', $data);
+
+		$response->setPublic();
+		$response->setEtag($etag);
+		$response->setExpires(\Carbon::Carbon()->addSeconds(
+			$this->app->config->get('combiner.javascript.expires')
+		));
+
+		$response->setContent($data);
+		
+		return $response;
+	}
+
+	protected function sanitize_files($arr)
+	{
+		foreach (array_keys($arr) as $idx)
+		{
+			$arr[$idx] = filter_var($arr[$idx], FILTER_SANITIZE_URL);
+		}
+
+		return $arr;
 	}
 }
