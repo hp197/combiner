@@ -84,7 +84,7 @@ class CombinerServiceProvider extends ServiceProvider
 
 		$this->app->router->get($uri, 
 			function (Route $route, Request $request, Response $response) {
-				$this->app->combiner->viewJS($route, $request, $response);
+				return $this->app->combiner->viewJS($route, $request, $response);
 			}
 		);
 	}
@@ -95,7 +95,7 @@ class CombinerServiceProvider extends ServiceProvider
 
 		$this->app->router->get($uri, 
 			function (Route $route, Request $request, Response $response) {
-				$this->app->combiner->viewCss($route, $request, $response);
+				return $this->app->combiner->viewCss($route, $request, $response);
 			}
 		);
 	}

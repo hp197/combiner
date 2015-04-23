@@ -4,7 +4,18 @@ use Illuminate\Routing\Route;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Foundation\Application;
+use Carbon\Carbon;
 
+/**
+ * Main Combiner class
+ * 
+ * @todo functionize the view class
+ * @todo better function naming
+ * @todo output complete html tags on (JS/Css)URL
+ * @todo write documentation
+ * @todo move import in css files to top of document (RFC)
+ *
+ */
 class Combiner
 {
 	protected static $_initialised = false;
@@ -45,9 +56,10 @@ class Combiner
 			return $response;
 		}
 
+		$count = $route->parameter('count', 0);
 		$files = explode(',', $route->parameter('files', ''));
 
-		if ($route->parameter('count', 0) <> count($files))
+		if ($count <> count($files))
 		{
 			$this->app->abort(422, 'Length option incorrect');
 		}
@@ -56,13 +68,28 @@ class Combiner
 		$files = $this->sanitize_files($files);
 		$filesstr = implode('_', $files);
 
-		$etag = implode('-', $request->getETags());
+		$etag = preg_replace('#^"(.*)"$#i', '\1', implode('-', $request->getETags()));
 
 		if (\Cache::has(sprintf('%s_%s_%d', $etag, $filesstr, $count)))
 		{
+			$response->setEtag($etag);
+
+			if ($response->isNotModified($request))
+			{
+				return $response->send();
+			}
+
 			$data = \Cache::get(sprintf('%s_%s_%d', $etag, $filesstr, $count));
 
-			return $this->output($response, $data);
+			$response->setPublic();
+			$response->setContent($data);
+			$response->setVary('etag', true);
+			$response->header('Content-Type', 'text/javascript', true);
+			$response->setExpires(Carbon::now()->addSeconds(
+				$this->app->config->get('combiner.javascript.expires')
+			));
+
+			return $response->send();
 		}
 
 		$basedir = $this->app->basePath() . DIRECTORY_SEPARATOR . $this->app->config->get('combiner.javascript.path');
@@ -76,14 +103,23 @@ class Combiner
 				continue;
 			}
 
-			$data .= file_get_contents($fullfile) . PHP_EOL;
+			$data .= @file_get_contents($fullfile) . PHP_EOL;
 		}
 
-		$this->output($response, $data);
+		$etag = md5($data);
 
-		\Cache::put(sprintf('%s_%s_%d', $response->getEtag(), $filesstr, $count), $data, \Carbin::Carbon()->addMinutes(60));
+		$response->setPublic();
+		$response->setEtag($etag);
+		$response->setContent($data);
+		$response->setVary('etag', true);
+		$response->header('Content-Type', 'text/javascript', true);
+		$response->setExpires(Carbon::now()->addSeconds(
+			$this->app->config->get('combiner.javascript.expires')
+		));
 
-		return $response;
+		\Cache::put(sprintf('%s_%s_%d', $etag, $filesstr, $count), $data, Carbon::now()->addMinutes(60));
+
+		return $response->send();
 	}
 
 	/**
@@ -265,21 +301,6 @@ class Combiner
 	protected function arrayPush(&$array, $value)
 	{
 		return (in_array($value, $array) || array_push($array, $value));
-	}
-
-	protected function output(Response &$response, $data='')
-	{
-		$etag = \Crypt::hash('js', $data);
-
-		$response->setPublic();
-		$response->setEtag($etag);
-		$response->setExpires(\Carbon::Carbon()->addSeconds(
-			$this->app->config->get('combiner.javascript.expires')
-		));
-
-		$response->setContent($data);
-		
-		return $response;
 	}
 
 	protected function sanitize_files($arr)
