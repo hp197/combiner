@@ -13,10 +13,10 @@ class Combiner
 	 * Application
 	 * @var \Illuminate\Foundation\Application
 	 */
-	protected $_app;
+	protected $app;
 
-	protected $_js_files = [];
-	protected $_css_files = [];
+	protected $_js = [];
+	protected $_css = [];
 
 	public function __construct(Application $app)
 	{
@@ -25,7 +25,7 @@ class Combiner
 			throw new \Exception('This class can only be initialized once.');
 		}
 
-		$this->_app = $app;
+		$this->app = $app;
 		self::$_initialised = true;
 	}
 
@@ -73,7 +73,7 @@ class Combiner
 	 * @param string|array $files
 	 * 
 	 * @throws \Exception
-	 * @return boolean
+	 * @return void
 	 */
 	public function addJS($files)
 	{
@@ -87,46 +87,10 @@ class Combiner
 				}
 			}
 
-			return true;
+			return;
 		}
 
-		return $this->addJSFile($files);
-	}
-
-	public function CssUrl()
-	{
-		$url = $this->_app->make('url')->to($this->app->config->get('combiner.css.route')) . '/';
-		$basedir = $this->app->config->get('combiner.css.path');
-		$count = 0;
-
-		foreach ($this->_css_files as $file)
-		{
-			if (file_exists($basedir . DIR_SEP . $file))
-			{
-				$url .= ($count ? ',':'') . str_replace('/', '~', $file);
-				$count++;
-			}
-		}
-
-		return sprintf('%s/%d/', $url, $count);
-	}
-
-	public function JSUrl()
-	{
-		$url = $this->_app->make('url')->to($this->app->config->get('combiner.javascript.route')) . '/';
-		$basedir = $this->app->config->get('combiner.javascript.path');
-		$count = 0;
-
-		foreach ($this->_js_files as $file)
-		{
-			if (file_exists($basedir . DIR_SEP . $file))
-			{
-				$url .= ($count ? ',':'') . str_replace('/', '~', $file);
-				$count++;
-			}
-		}
-
-		return sprintf('%s/%d/', $url, $count);
+		$this->addJSFile($files);
 	}
 
 	/**
@@ -135,7 +99,7 @@ class Combiner
 	 * @param string|array $files
 	 *
 	 * @throws \Exception
-	 * @return boolean
+	 * @return void
 	 */
 	public function addCSS($files)
 	{
@@ -149,10 +113,56 @@ class Combiner
 				}
 			}
 
-			return true;
+			return;
 		}
 
-		return $this->addJSFile($files);
+		$this->addJSFile($files);
+	}
+
+	public function CssUrl()
+	{
+		if (!count($this->_css))
+		{
+			return '';
+		}
+
+		$url = $this->app->make('url')->to($this->app->config->get('combiner.css.route')) . '/';
+		$basedir = $this->app->basePath() . DIRECTORY_SEPARATOR . $this->app->config->get('combiner.css.path');
+		$count = 0;
+
+		foreach ($this->_css as $file)
+		{
+			if (file_exists($basedir . DIRECTORY_SEPARATOR . $file))
+			{
+				$url .= ($count ? ',':'') . str_replace('/', '~', $file);
+				$count++;
+			}
+		}
+
+		return sprintf('%s/%d/', $url, $count);
+	}
+
+	public function JSUrl()
+	{
+		if (!count($this->_js))
+		{
+			return '';
+		}
+
+		$url = $this->app->make('url')->to($this->app->config->get('combiner.javascript.route')) . '/';
+		$basedir = $this->app->basePath() . DIRECTORY_SEPARATOR . $this->app->config->get('combiner.javascript.path');
+		$count = 0;
+
+		foreach ($this->_js as $file)
+		{
+			if (file_exists($basedir . DIRECTORY_SEPARATOR . $file))
+			{
+				$url .= ($count ? ',':'') . str_replace('/', '~', $file);
+				$count++;
+			}
+		}
+
+		return sprintf('%s/%d/', $url, $count);
 	}
 
 	
@@ -211,6 +221,6 @@ class Combiner
 	 */
 	protected function arrayPush(&$array, $value)
 	{
-		return (in_array($value, $array) || ($array = array_push($array, $value)));
+		return (in_array($value, $array) || array_push($array, $value));
 	}
 }

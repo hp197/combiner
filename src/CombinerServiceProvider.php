@@ -80,7 +80,9 @@ class CombinerServiceProvider extends ServiceProvider
 
 	protected function enableJSCombiner()
 	{
-		$this->app->router->filter($this->app->config->get('combiner.javascript.route'), 
+		$uri = $this->makeRouteURI($this->app->config->get('combiner.javascript.route'));
+
+		$this->app->router->get($uri, 
 			function (Route $route, Request $request, Response $response) {
 				$this->app->combiner->viewJS($route, $request, $response);
 			}
@@ -89,10 +91,22 @@ class CombinerServiceProvider extends ServiceProvider
 
 	protected function enableCssCombiner()
 	{
-		$this->app->router->filter($this->app->config->get('combiner.css.route'), 
+		$uri = $this->makeRouteURI($this->app->config->get('combiner.css.route'));
+
+		$this->app->router->get($uri, 
 			function (Route $route, Request $request, Response $response) {
 				$this->app->combiner->viewCss($route, $request, $response);
 			}
 		);
+	}
+
+	protected function makeRouteURI($baseURI)
+	{
+		if (!preg_match('#/{files\?}/{count\?}/?$#i', $baseURI))
+		{
+			$baseURI .= '/{files?}/{count}';
+		}
+
+		return $baseURI;
 	}
 }
